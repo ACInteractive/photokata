@@ -1,3 +1,3 @@
 #/bin/bash
 
-./backend
+./accounts_mserv
