@@ -1,15 +1,19 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"github.com/pascaldekloe/jwt"
 )
 
 type App struct {
@@ -41,6 +45,7 @@ func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/user/{id:[0-9]+}", a.getUser).Methods("GET")
 	a.Router.HandleFunc("/user/{id:[0-9]+}", a.updateUser).Methods("PUT")
 	a.Router.HandleFunc("/user/{id:[0-9]+}", a.deleteUser).Methods("DELETE")
+	a.Router.HandleFunc("/token", a.getToken).Methods("GET")
 }
 
 func (a *App) getUsers(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +147,26 @@ func (a *App) deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"result": "success"})
+}
+
+func (a *App) getToken(w http.ResponseWriter, r *http.Request) {
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		fmt.Println("key generation error:", err)
+		return
+	}
+
+	var claims jwt.Claims
+	claims.Subject = "alice@example.com"
+
+	now := time.Now().Round(time.Second)
+	claims.Issued = jwt.NewNumericTime(now)
+	claims.Expires = jwt.NewNumericTime(now.Add(10 * time.Minute))
+
+	// issue a JWT
+	token, err := claims.EdDSASign(privateKey)
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"token": string(token)})
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
