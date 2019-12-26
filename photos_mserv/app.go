@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -18,6 +20,10 @@ import (
 type App struct {
 	Router *mux.Router
 	DB     *sql.DB
+}
+
+type myData struct {
+	FileName string
 }
 
 func (a *App) Initialize(user, password, dbname string) {
@@ -40,6 +46,7 @@ func (a *App) Run(addr string) {
 
 func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/token", a.getToken).Methods("GET")
+	a.Router.HandleFunc("/photo", a.recvPhoto).Methods("POST")
 }
 
 func (a *App) getToken(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +67,23 @@ func (a *App) getToken(w http.ResponseWriter, r *http.Request) {
 	token, err := claims.EdDSASign(privateKey)
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"token": string(token)})
+}
+
+func (a *App) recvPhoto(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	filename := r.Form.Get("filename")
+
+	defer r.Body.Close()
+
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer f.Close()
+	io.Copy(f, r.Body)
+
+	respondWithJSON(w, http.StatusOK, map[string]string{"token": "test"})
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {
